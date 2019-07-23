@@ -157,3 +157,46 @@ test "library works" {
     ));
     testing.expectEqual(c_int(lua.LUA_OK), lua.lua_pcallk(L, 0, 0, 0, 0, null));
 }
+
+test "wrap struct works" {
+    const L = lua.luaL_newstate();
+    lua.luaL_openlibs(L);
+    testing.expectEqual(c_int(lua.LUA_OK), lua.luaL_loadstring(L,
+        c\\local lib = ...
+        c\\assert(lib.get_void() == nil)
+        c\\assert(lib.get_bool() == false)
+        c\\assert(lib.get_i8() == 42)
+        c\\assert(lib.get_f16() == 1<<10)
+        c\\assert(lib.add_u32(5432, 1234) == 6666)
+    ));
+    autolua.pushlib(L, struct {
+        pub fn get_void() void {
+            return func_void();
+        }
+
+        pub fn get_bool() bool {
+            return func_bool();
+        }
+
+        pub fn get_i8() i8 {
+            return func_i8();
+        }
+
+        pub fn get_i64() i64 {
+            return func_i64();
+        }
+
+        pub fn get_f16() f16 {
+            return func_f16();
+        }
+
+        pub fn get_f64() f64 {
+            return func_f64();
+        }
+
+        pub fn add_u32(x: u32, y: u32) u32 {
+            return func_addu32(x, y);
+        }
+    });
+    testing.expectEqual(c_int(lua.LUA_OK), lua.lua_pcallk(L, 1, 0, 0, 0, null));
+}

@@ -52,6 +52,39 @@ pub fn push(L: ?*lua.lua_State, value: var) void {
     }
 }
 
+
+pub fn pushlib(L: ?*lua.lua_State, comptime value: type) void {
+    const Composite = switch(@typeInfo(value)) {
+        .Struct => |t| t,
+        .Union => |t| t,
+        .Enum => |t| t,
+        else => @compileError("unable to push type " ++ @typeName(value)),
+    };
+
+    {
+        comptime var nrec = 0;
+        inline for (Composite.decls) |d| {
+            if (d.is_pub) {
+                nrec += 1;
+            }
+        }
+        lua.lua_createtable(L, 0, nrec);
+    }
+
+    inline for (Composite.decls) |d| {
+        if (d.is_pub) {
+            switch (d.data) {
+                .Var, .Fn => {
+                    _ = lua.lua_pushlstring(L, d.name.ptr, d.name.len);
+                    lua.lua_pushcclosure(L, wrap(@field(value, d.name)), 0);
+                    lua.lua_rawset(L, -3);
+                },
+                else => @compileError("NYI: Type"),
+            }
+        }
+    }
+}
+
 pub fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
     switch (@typeInfo(T)) {
         .Void => {
