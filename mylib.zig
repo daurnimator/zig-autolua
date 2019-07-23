@@ -67,20 +67,36 @@ fn wrap(comptime func: var) switch (@typeId(@typeOf(func))) {
     .Fn => lua.lua_CFunction,
     else => @compileError("unable to wrap type: " ++ @typeName(@typeOf(func))),
 } {
-    const ti = @typeInfo(@typeOf(func));
+    const Fn = @typeInfo(@typeOf(func)).Fn;
     // See https://github.com/ziglang/zig/issues/229
     return struct {
+        // See https://github.com/ziglang/zig/issues/2930
+        fn call(L: ?*lua.lua_State) (if (Fn.return_type) |rt| rt else noreturn) {
+            if (Fn.args.len == 0) return @inlineCall(func);
+            const a1 = check(L, 1, Fn.args[0].arg_type.?);
+            if (Fn.args.len == 1) return @inlineCall(func, a1);
+            const a2 = check(L, 2, Fn.args[1].arg_type.?);
+            if (Fn.args.len == 2) return @inlineCall(func, a1, a2);
+            const a3 = check(L, 3, Fn.args[2].arg_type.?);
+            if (Fn.args.len == 3) return @inlineCall(func, a1, a2, a3);
+            const a4 = check(L, 4, Fn.args[3].arg_type.?);
+            if (Fn.args.len == 4) return @inlineCall(func, a1, a2, a3, a4);
+            const a5 = check(L, 5, Fn.args[4].arg_type.?);
+            if (Fn.args.len == 5) return @inlineCall(func, a1, a2, a3, a4, a5);
+            const a6 = check(L, 6, Fn.args[5].arg_type.?);
+            if (Fn.args.len == 6) return @inlineCall(func, a1, a2, a3, a4, a5, a6);
+            const a7 = check(L, 7, Fn.args[6].arg_type.?);
+            if (Fn.args.len == 7) return @inlineCall(func, a1, a2, a3, a4, a5, a6, a7);
+            const a8 = check(L, 8, Fn.args[7].arg_type.?);
+            if (Fn.args.len == 8) return @inlineCall(func, a1, a2, a3, a4, a5, a6, a7, a8);
+            const a9 = check(L, 9, Fn.args[8].arg_type.?);
+            if (Fn.args.len == 9) return @inlineCall(func, a1, a2, a3, a4, a5, a6, a7, a8, a9);
+            @panic("NYI: >9 argument functions");
+        }
+
         extern fn wrapped_func(L: ?*lua.lua_State) c_int {
-            inline for (ti.Fn.args) |arg, i| {
-                if (arg.generic) {
-                    @compileError("NYI");
-                } else {
-                    // TODO: collect into args and pass to function
-                    _ = check(L, i, arg.arg_type.?);
-                }
-            }
-            if (ti.Fn.return_type) |return_type| {
-                const result: return_type = func();
+            if (Fn.return_type) |return_type| {
+                const result: return_type = @inlineCall(call, L);
                 if (return_type == void) {
                     return 0;
                 } else {
@@ -125,6 +141,9 @@ fn func_f128() f128 {
     return 1 << 63;
 }
 
+fn func_addu32(x: u32, y: u32) u32 {
+    return x + y;
+}
 
 extern fn bar(L: ?*lua.lua_State) c_int {
     return 0;
@@ -139,6 +158,7 @@ const lib = [_]lua.luaL_Reg{
     lua.luaL_Reg{ .name = c"func_f16", .func = wrap(func_f16) },
     lua.luaL_Reg{ .name = c"func_f64", .func = wrap(func_f64) },
     // lua.luaL_Reg{ .name = c"func_f128", .func = wrap(func_f128) },
+    lua.luaL_Reg{ .name = c"func_addu32", .func = wrap(func_addu32) },
     lua.luaL_Reg{ .name = c"bar", .func = bar },
     lua.luaL_Reg{ .name = 0, .func = null },
 };
@@ -177,6 +197,15 @@ test "wrapping float returning function works" {
     testing.expectEqual(f16(1 << 10), check(L, 1, f16));
 }
 
+test "wrapping function that takes arguments works" {
+    const L = lua.luaL_newstate();
+    lua.lua_pushcclosure(L, wrap(func_addu32), 0);
+    lua.lua_pushinteger(L, 5);
+    lua.lua_pushinteger(L, 1000);
+    testing.expectEqual(c_int(lua.LUA_OK), lua.lua_pcallk(L, 2, lua.LUA_MULTRET, 0, 0, null));
+    testing.expectEqual(u32(5 + 1000), check(L, 1, u32));
+}
+
 test "library works" {
     const L = lua.luaL_newstate();
     lua.luaL_openlibs(L);
@@ -188,6 +217,7 @@ test "library works" {
         c\\assert(mylib.func_bool() == false)
         c\\assert(mylib.func_i8() == 42)
         c\\assert(mylib.func_f16() == 1<<10)
+        c\\assert(mylib.func_addu32(5432, 1234) == 6666)
     ));
     testing.expectEqual(c_int(lua.LUA_OK), lua.lua_pcallk(L, 0, 0, 0, 0, null));
 }
