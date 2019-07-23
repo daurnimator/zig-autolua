@@ -142,7 +142,7 @@ pub fn wrap(comptime func: var) switch (@typeId(@typeOf(func))) {
             if (Fn.args.len == 8) return @inlineCall(func, a1, a2, a3, a4, a5, a6, a7, a8);
             const a9 = check(L, 9, Fn.args[8].arg_type.?);
             if (Fn.args.len == 9) return @inlineCall(func, a1, a2, a3, a4, a5, a6, a7, a8, a9);
-            @panic("NYI: >9 argument functions");
+            @compileError("NYI: >9 argument functions");
         }
 
         extern fn thunk(L: ?*lua.lua_State) c_int {
