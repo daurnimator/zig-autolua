@@ -14,6 +14,15 @@ pub const lua = struct {
     pub fn lua_pop(L: ?*lua.lua_State, n: c_int) void {
         lua_settop(L, -(n) - 1);
     }
+
+    pub fn lua_replace(L: ?*lua.lua_State, idx: c_int) void {
+        lua_copy(L, -1, idx);
+        lua_pop(L, 1);
+    }
+
+    pub fn lua_call(L: ?*lua.lua_State, n: c_int, r: c_int) void {
+        lua_callk(L, n, r, 0, null);
+    }
 };
 
 const lua_int_type = @typeInfo(lua.lua_Integer).Int;
