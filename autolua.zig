@@ -83,18 +83,20 @@ pub fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
             }
         },
         .Pointer => |PT| {
+            if (T == [*c]c_void) {
+                return lua.lua_topointer(L, idx);
+            }
+
             const t = lua.lua_type(L, idx);
             if (T == []const u8) {
                 if (t == lua.LUA_TSTRING) {
                     var len: usize = undefined;
                     const ptr = lua.lua_tolstring(L, idx, &len);
                     return ptr[0..len];
-                } else if (t != lua.LUA_TUSERDATA and t != lua.LUA_TLIGHTUSERDATA) {
+                } else if (t != lua.LUA_TUSERDATA) {
                     _ = lua.luaL_argerror(L, idx, c"expected string or userdata");
                     unreachable;
                 }
-            } else if (T == [*c]c_void) {
-                return lua.lua_topointer(L, idx);
             } else {
                 if (t != lua.LUA_TUSERDATA) {
                     _ = lua.luaL_argerror(L, idx, c"expected userdata");
