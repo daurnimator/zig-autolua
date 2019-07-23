@@ -130,7 +130,7 @@ extern fn bar(L: ?*lua.lua_State) c_int {
     return 0;
 }
 
-const lib = []lua.luaL_Reg{
+const lib = [_]lua.luaL_Reg{
     lua.luaL_Reg{ .name = c"func_void", .func = wrap(func_void) },
     lua.luaL_Reg{ .name = c"func_bool", .func = wrap(func_bool) },
     lua.luaL_Reg{ .name = c"func_i8", .func = wrap(func_i8) },
