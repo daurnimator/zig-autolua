@@ -43,7 +43,7 @@ pub fn push(L: ?*lua.lua_State, value: var) void {
         },
         .Pointer => |PT| {
             if (PT.size == .Slice and PT.child == u8) {
-                lua.lua_pushlstring(L, value.ptr, value.len);
+                _ = lua.lua_pushlstring(L, value.ptr, value.len);
             } else {
                 @compileError("unable to coerce from type: " ++ @typeName(@typeOf(value)));
             }
@@ -83,7 +83,7 @@ pub fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
             }
         },
         .Pointer => |PT| {
-            if (T == [*c]c_void) {
+            if (T == *c_void) {
                 return lua.lua_topointer(L, idx);
             }
 
