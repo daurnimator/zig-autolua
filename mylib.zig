@@ -23,12 +23,11 @@ const lua_float_type = @typeInfo(lua.lua_Number).Float;
 fn push(L: ?*lua.lua_State, value: var) void {
     switch (@typeId(@typeOf(value))) {
         .Void => lua.lua_pushnil(L),
-        .Bool => lua.lua_pushboolean(L, if(value) u1(1) else u1(0)),
+        .Bool => lua.lua_pushboolean(L, if (value) u1(1) else u1(0)),
         .Int => {
             const int_type = @typeInfo(@typeOf(value)).Int;
             assert(lua_int_type.is_signed);
-            if (int_type.bits > lua_int_type.bits
-                or (!int_type.is_signed and int_type.bits >= lua_int_type.bits)) {
+            if (int_type.bits > lua_int_type.bits or (!int_type.is_signed and int_type.bits >= lua_int_type.bits)) {
                 @compileError("unable to coerce from type: " ++ @typeName(@typeOf(value)));
             }
             lua.lua_pushinteger(L, value);
@@ -64,7 +63,7 @@ fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
     }
 }
 
-fn wrap(comptime func: var) switch(@typeId(@typeOf(func))) {
+fn wrap(comptime func: var) switch (@typeId(@typeOf(func))) {
     .Fn => lua.lua_CFunction,
     else => @compileError("unable to wrap type: " ++ @typeName(@typeOf(func))),
 } {
@@ -90,14 +89,13 @@ fn wrap(comptime func: var) switch(@typeId(@typeOf(func))) {
                 }
             } else {
                 // is noreturn
-                func();
+                @inlineCall(call, L);
             }
         }
     }.wrapped_func;
 }
 
-fn func_void() void {
-}
+fn func_void() void {}
 
 fn func_bool() bool {
     return false;
@@ -108,23 +106,23 @@ fn func_i8() i8 {
 }
 
 fn func_i64() i64 {
-    return 1<<62;
+    return 1 << 62;
 }
 
 fn func_u64() u64 {
-    return 1<<63;
+    return 1 << 63;
 }
 
 fn func_f16() f16 {
-    return 1<<10;
+    return 1 << 10;
 }
 
 fn func_f64() f64 {
-    return 1<<64;
+    return 1 << 64;
 }
 
 fn func_f128() f128 {
-    return 1<<63;
+    return 1 << 63;
 }
 
 
@@ -176,7 +174,7 @@ test "wrapping float returning function works" {
     const L = lua.luaL_newstate();
     lua.lua_pushcclosure(L, wrap(func_f16), 0);
     testing.expectEqual(c_int(lua.LUA_OK), lua.lua_pcallk(L, 0, lua.LUA_MULTRET, 0, 0, null));
-    testing.expectEqual(f16(1<<10), check(L, 1, f16));
+    testing.expectEqual(f16(1 << 10), check(L, 1, f16));
 }
 
 test "library works" {
