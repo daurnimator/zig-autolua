@@ -1,8 +1,8 @@
 // test with:
-// zig test --library c --library lua -isystem /usr/include/ -L/usr/lib src/mylib.zig
+// zig test --library c --library lua -isystem /usr/include/ -L/usr/lib mylib.zig
 //
 // build with:
-// zig build-lib -dynamic --library c -isystem /usr/include/ src/mylib.zig
+// zig build-lib -dynamic --library c -isystem /usr/include/ mylib.zig
 // mv libmylib.so.0.0.0 mylib.so
 //
 // run example:
