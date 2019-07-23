@@ -114,10 +114,8 @@ pub fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
     }
 }
 
-pub fn wrap(comptime func: var) switch (@typeId(@typeOf(func))) {
-    .Fn => lua.lua_CFunction,
-    else => @compileError("unable to wrap type: " ++ @typeName(@typeOf(func))),
-} {
+/// Wraps an arbitrary function in a Lua C-API using version
+pub fn wrap(comptime func: var) lua.lua_CFunction {
     const Fn = @typeInfo(@typeOf(func)).Fn;
     // See https://github.com/ziglang/zig/issues/229
     return struct {
