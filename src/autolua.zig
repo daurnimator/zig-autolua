@@ -1,48 +1,30 @@
 const std = @import("std");
 const assert = std.debug.assert;
 
-const lua_ABI = @cImport({
+pub const lua = @cImport({
     @cInclude("lua.h");
     @cInclude("lauxlib.h");
     @cInclude("lualib.h");
 });
 
-pub const lua = struct {
-    pub usingnamespace lua_ABI;
-
-    // implement macros
-    pub fn lua_pop(L: ?*lua.lua_State, n: c_int) void {
-        lua_settop(L, -(n) - 1);
-    }
-
-    pub fn lua_replace(L: ?*lua.lua_State, idx: c_int) void {
-        lua_copy(L, -1, idx);
-        lua_pop(L, 1);
-    }
-
-    pub fn lua_call(L: ?*lua.lua_State, n: c_int, r: c_int) void {
-        lua_callk(L, n, r, 0, null);
-    }
-};
-
 const lua_int_type = @typeInfo(lua.lua_Integer).Int;
 const lua_float_type = @typeInfo(lua.lua_Number).Float;
 pub fn push(L: ?*lua.lua_State, value: var) void {
-    switch (@typeId(@typeOf(value))) {
+    switch (@typeId(@TypeOf(value))) {
         .Void => lua.lua_pushnil(L),
-        .Bool => lua.lua_pushboolean(L, if (value) u1(1) else u1(0)),
+        .Bool => lua.lua_pushboolean(L, if (value) @as(u1, 1) else @as(u1, 0)),
         .Int => {
-            const int_type = @typeInfo(@typeOf(value)).Int;
+            const int_type = @typeInfo(@TypeOf(value)).Int;
             assert(lua_int_type.is_signed);
             if (int_type.bits > lua_int_type.bits or (!int_type.is_signed and int_type.bits >= lua_int_type.bits)) {
-                @compileError("unable to coerce from type: " ++ @typeName(@typeOf(value)));
+                @compileError("unable to coerce from type: " ++ @typeName(@TypeOf(value)));
             }
             lua.lua_pushinteger(L, value);
         },
         .Float => {
-            const float_type = @typeInfo(@typeOf(value)).Float;
+            const float_type = @typeInfo(@TypeOf(value)).Float;
             if (float_type.bits > lua_float_type.bits) {
-                @compileError("unable to coerce from type: " ++ @typeName(@typeOf(value)));
+                @compileError("unable to coerce from type: " ++ @typeName(@TypeOf(value)));
             }
             lua.lua_pushnumber(L, value);
         },
@@ -54,16 +36,15 @@ pub fn push(L: ?*lua.lua_State, value: var) void {
             if (PT.size == .Slice and PT.child == u8) {
                 _ = lua.lua_pushlstring(L, value.ptr, value.len);
             } else {
-                @compileError("unable to coerce from type: " ++ @typeName(@typeOf(value)));
+                @compileError("unable to coerce from type: " ++ @typeName(@TypeOf(value)));
             }
         },
-        else => @compileError("unable to coerce from type: " ++ @typeName(@typeOf(value))),
+        else => @compileError("unable to coerce from type: " ++ @typeName(@TypeOf(value))),
     }
 }
 
-
 pub fn pushlib(L: ?*lua.lua_State, comptime value: type) void {
-    const Composite = switch(@typeInfo(value)) {
+    const Composite = switch (@typeInfo(value)) {
         .Struct => |t| t,
         .Union => |t| t,
         .Enum => |t| t,
@@ -107,7 +88,7 @@ pub fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
         .Int => return @intCast(T, lua.luaL_checkinteger(L, idx)),
         .Float => return @floatCast(T, lua.luaL_checknumber(L, idx)),
         .Array => |AT| {
-            switch(lua.lua_type(L, idx)) {
+            switch (lua.lua_type(L, idx)) {
                 lua.LUA_TTABLE => {
                     var A: T = undefined;
                     for (A) |*p, i| {
@@ -119,7 +100,7 @@ pub fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
                 },
                 // TODO: lua.LUA_TUSERDATA
                 else => {
-                    _ = lua.luaL_argerror(L, idx, c"expected table");
+                    _ = lua.luaL_argerror(L, idx, "expected table");
                     unreachable;
                 },
             }
@@ -136,17 +117,17 @@ pub fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
                     const ptr = lua.lua_tolstring(L, idx, &len);
                     return ptr[0..len];
                 } else if (t != lua.LUA_TUSERDATA) {
-                    _ = lua.luaL_argerror(L, idx, c"expected string or userdata");
+                    _ = lua.luaL_argerror(L, idx, "expected string or userdata");
                     unreachable;
                 }
             } else {
                 if (t != lua.LUA_TUSERDATA) {
-                    _ = lua.luaL_argerror(L, idx, c"expected userdata");
+                    _ = lua.luaL_argerror(L, idx, "expected userdata");
                     unreachable;
                 }
             }
             if (lua.lua_getmetatable(L, idx) == 0) {
-                _ = lua.luaL_argerror(L, idx, c"unexpected userdata metatable");
+                _ = lua.luaL_argerror(L, idx, "unexpected userdata metatable");
                 unreachable;
             }
             // TODO: check if metatable is valid for Pointer type
@@ -160,36 +141,36 @@ pub fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
 
 /// Wraps an arbitrary function in a Lua C-API using version
 pub fn wrap(comptime func: var) lua.lua_CFunction {
-    const Fn = @typeInfo(@typeOf(func)).Fn;
+    const Fn = @typeInfo(@TypeOf(func)).Fn;
     // See https://github.com/ziglang/zig/issues/229
     return struct {
         // See https://github.com/ziglang/zig/issues/2930
         fn call(L: ?*lua.lua_State) (if (Fn.return_type) |rt| rt else noreturn) {
-            if (Fn.args.len == 0) return @inlineCall(func);
+            if (Fn.args.len == 0) return @call(.{}, func, .{});
             const a1 = check(L, 1, Fn.args[0].arg_type.?);
-            if (Fn.args.len == 1) return @inlineCall(func, a1);
+            if (Fn.args.len == 1) return @call(.{}, func, .{a1});
             const a2 = check(L, 2, Fn.args[1].arg_type.?);
-            if (Fn.args.len == 2) return @inlineCall(func, a1, a2);
+            if (Fn.args.len == 2) return @call(.{}, func, .{ a1, a2 });
             const a3 = check(L, 3, Fn.args[2].arg_type.?);
-            if (Fn.args.len == 3) return @inlineCall(func, a1, a2, a3);
+            if (Fn.args.len == 3) return @call(.{}, func, .{ a1, a2, a3 });
             const a4 = check(L, 4, Fn.args[3].arg_type.?);
-            if (Fn.args.len == 4) return @inlineCall(func, a1, a2, a3, a4);
+            if (Fn.args.len == 4) return @call(.{}, func, .{ a1, a2, a3, a4 });
             const a5 = check(L, 5, Fn.args[4].arg_type.?);
-            if (Fn.args.len == 5) return @inlineCall(func, a1, a2, a3, a4, a5);
+            if (Fn.args.len == 5) return @call(.{}, func, .{ a1, a2, a3, a4, a5 });
             const a6 = check(L, 6, Fn.args[5].arg_type.?);
-            if (Fn.args.len == 6) return @inlineCall(func, a1, a2, a3, a4, a5, a6);
+            if (Fn.args.len == 6) return @call(.{}, func, .{ a1, a2, a3, a4, a5, a6 });
             const a7 = check(L, 7, Fn.args[6].arg_type.?);
-            if (Fn.args.len == 7) return @inlineCall(func, a1, a2, a3, a4, a5, a6, a7);
+            if (Fn.args.len == 7) return @call(.{}, func, .{ a1, a2, a3, a4, a5, a6, a7 });
             const a8 = check(L, 8, Fn.args[7].arg_type.?);
-            if (Fn.args.len == 8) return @inlineCall(func, a1, a2, a3, a4, a5, a6, a7, a8);
+            if (Fn.args.len == 8) return @call(.{}, func, .{ a1, a2, a3, a4, a5, a6, a7, a8 });
             const a9 = check(L, 9, Fn.args[8].arg_type.?);
-            if (Fn.args.len == 9) return @inlineCall(func, a1, a2, a3, a4, a5, a6, a7, a8, a9);
+            if (Fn.args.len == 9) return @call(.{}, func, .{ a1, a2, a3, a4, a5, a6, a7, a8, a9 });
             @compileError("NYI: >9 argument functions");
         }
 
-        extern fn thunk(L: ?*lua.lua_State) c_int {
+        fn thunk(L: ?*lua.lua_State) callconv(.C) c_int {
             if (Fn.return_type) |return_type| {
-                const result: return_type = @inlineCall(call, L);
+                const result: return_type = @call(.{ .modifier = .always_inline }, call, .{L});
                 if (return_type == void) {
                     return 0;
                 } else {
@@ -198,7 +179,7 @@ pub fn wrap(comptime func: var) lua.lua_CFunction {
                 }
             } else {
                 // is noreturn
-                @inlineCall(call, L);
+                @call(.{ .modifier = .always_inline }, call, .{L});
             }
         }
     }.thunk;
