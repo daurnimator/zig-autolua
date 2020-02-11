@@ -65,7 +65,8 @@ pub fn push(L: ?*lua.lua_State, value: var) void {
         },
         .Fn => {
             // TODO: check if already the correct signature?
-            lua.lua_pushcclosure(L, wrap(value), 0);
+            const wrapped = wrap(value) catch @compileError("unable to push function of type '" ++ @typeName(T) ++ "'");
+            lua.lua_pushcclosure(L, wrapped, 0);
         },
         .Pointer => |PointerInfo| switch (PointerInfo.size) {
             .Slice => {
@@ -110,7 +111,7 @@ pub fn pushlib(L: ?*lua.lua_State, comptime value: type) void {
             // workaround for "unable to evaluate constant expression" error when calling `push` with a function
             switch (d.data) {
                 .Var, .Type => push(L, @field(value, d.name)),
-                .Fn => lua.lua_pushcclosure(L, wrap(@field(value, d.name)), 0),
+                .Fn => lua.lua_pushcclosure(L, try wrap(@field(value, d.name)), 0),
             }
             lua.lua_rawset(L, -3);
         }
@@ -182,8 +183,12 @@ pub fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
 }
 
 /// Wraps an arbitrary function in a Lua C-API using version
-pub fn wrap(comptime func: var) lua.lua_CFunction {
+pub fn wrap(comptime func: var) error{GenericFunction}!lua.lua_CFunction {
     const Fn = @typeInfo(@TypeOf(func)).Fn;
+    inline for (Fn.args) |arg| {
+        if (arg.arg_type == null) return error.GenericFunction;
+    }
+
     // See https://github.com/ziglang/zig/issues/229
     return struct {
         // See https://github.com/ziglang/zig/issues/2930

@@ -74,16 +74,16 @@ fn bar(L: ?*lua.lua_State) callconv(.C) c_int {
 }
 
 const lib = [_]lua.luaL_Reg{
-    lua.luaL_Reg{ .name = "func_void", .func = autolua.wrap(func_void) },
-    lua.luaL_Reg{ .name = "func_bool", .func = autolua.wrap(func_bool) },
-    lua.luaL_Reg{ .name = "func_i8", .func = autolua.wrap(func_i8) },
-    lua.luaL_Reg{ .name = "func_i64", .func = autolua.wrap(func_i64) },
-    // lua.luaL_Reg{ .name = "func_u64", .func = autolua.wrap(func_u64) },
-    lua.luaL_Reg{ .name = "func_f16", .func = autolua.wrap(func_f16) },
-    lua.luaL_Reg{ .name = "func_f64", .func = autolua.wrap(func_f64) },
-    // lua.luaL_Reg{ .name = "func_f128", .func = autolua.wrap(func_f128) },
-    lua.luaL_Reg{ .name = "func_addu32", .func = autolua.wrap(func_addu32) },
-    // lua.luaL_Reg{ .name = "func_error", .func = autolua.wrap(func_error) },
+    lua.luaL_Reg{ .name = "func_void", .func = try autolua.wrap(func_void) },
+    lua.luaL_Reg{ .name = "func_bool", .func = try autolua.wrap(func_bool) },
+    lua.luaL_Reg{ .name = "func_i8", .func = try autolua.wrap(func_i8) },
+    lua.luaL_Reg{ .name = "func_i64", .func = try autolua.wrap(func_i64) },
+    // lua.luaL_Reg{ .name = "func_u64", .func = try autolua.wrap(func_u64) },
+    lua.luaL_Reg{ .name = "func_f16", .func = try autolua.wrap(func_f16) },
+    lua.luaL_Reg{ .name = "func_f64", .func = try autolua.wrap(func_f64) },
+    // lua.luaL_Reg{ .name = "func_f128", .func = try autolua.wrap(func_f128) },
+    lua.luaL_Reg{ .name = "func_addu32", .func = try autolua.wrap(func_addu32) },
+    // lua.luaL_Reg{ .name = "func_error", .func = try autolua.wrap(func_error) },
     lua.luaL_Reg{ .name = "bar", .func = bar },
     lua.luaL_Reg{ .name = 0, .func = null },
 };
@@ -97,7 +97,7 @@ export fn luaopen_mylib(L: ?*lua.lua_State) c_int {
 test "wrapping void returning function works" {
     const L = try autolua.newState(std.testing.allocator);
     defer lua.lua_close(L);
-    lua.lua_pushcclosure(L, autolua.wrap(func_void), 0);
+    lua.lua_pushcclosure(L, try autolua.wrap(func_void), 0);
     testing.expectEqual(@as(c_int, lua.LUA_OK), lua.lua_pcallk(L, 0, lua.LUA_MULTRET, 0, 0, null));
     testing.expectEqual(@as(c_int, 0), lua.lua_gettop(L));
 }
@@ -105,7 +105,7 @@ test "wrapping void returning function works" {
 test "wrapping boolean returning function works" {
     const L = try autolua.newState(std.testing.allocator);
     defer lua.lua_close(L);
-    lua.lua_pushcclosure(L, autolua.wrap(func_bool), 0);
+    lua.lua_pushcclosure(L, try autolua.wrap(func_bool), 0);
     testing.expectEqual(@as(c_int, lua.LUA_OK), lua.lua_pcallk(L, 0, lua.LUA_MULTRET, 0, 0, null));
     testing.expectEqual(false, autolua.check(L, 1, bool));
 }
@@ -113,7 +113,7 @@ test "wrapping boolean returning function works" {
 test "wrapping integer returning function works" {
     const L = try autolua.newState(std.testing.allocator);
     defer lua.lua_close(L);
-    lua.lua_pushcclosure(L, autolua.wrap(func_i8), 0);
+    lua.lua_pushcclosure(L, try autolua.wrap(func_i8), 0);
     testing.expectEqual(@as(c_int, lua.LUA_OK), lua.lua_pcallk(L, 0, lua.LUA_MULTRET, 0, 0, null));
     testing.expectEqual(@as(i8, 42), autolua.check(L, 1, i8));
 }
@@ -121,7 +121,7 @@ test "wrapping integer returning function works" {
 test "wrapping float returning function works" {
     const L = try autolua.newState(std.testing.allocator);
     defer lua.lua_close(L);
-    lua.lua_pushcclosure(L, autolua.wrap(func_f16), 0);
+    lua.lua_pushcclosure(L, try autolua.wrap(func_f16), 0);
     testing.expectEqual(@as(c_int, lua.LUA_OK), lua.lua_pcallk(L, 0, lua.LUA_MULTRET, 0, 0, null));
     testing.expectEqual(@as(f16, 1 << 10), autolua.check(L, 1, f16));
 }
@@ -129,7 +129,7 @@ test "wrapping float returning function works" {
 test "wrapping function that takes arguments works" {
     const L = try autolua.newState(std.testing.allocator);
     defer lua.lua_close(L);
-    lua.lua_pushcclosure(L, autolua.wrap(func_addu32), 0);
+    lua.lua_pushcclosure(L, try autolua.wrap(func_addu32), 0);
     lua.lua_pushinteger(L, 5);
     lua.lua_pushinteger(L, 1000);
     testing.expectEqual(@as(c_int, lua.LUA_OK), lua.lua_pcallk(L, 2, lua.LUA_MULTRET, 0, 0, null));
@@ -139,7 +139,7 @@ test "wrapping function that takes arguments works" {
 // test "wrapping function that throws error" {
 //     const L = try autolua.newState(std.testing.allocator);
 //     defer lua.lua_close(L);
-//     lua.lua_pushcclosure(L, autolua.wrap(func_error), 0);
+//     lua.lua_pushcclosure(L, try autolua.wrap(func_error), 0);
 //     testing.expectEqual(@as(c_int, lua.LUA_ERRRUN), lua.lua_pcallk(L, 0, lua.LUA_MULTRET, 0, 0, null));
 //     testing.expect(error.SomeError == autolua.check(L, 1, anyerror));
 // }
@@ -147,7 +147,7 @@ test "wrapping function that takes arguments works" {
 // test "wrapping unreachable function" {
 //     const L = try autolua.newState(std.testing.allocator);
 //     defer lua.lua_close(L);
-//     lua.lua_pushcclosure(L, autolua.wrap(func_unreachable), 0);
+//     lua.lua_pushcclosure(L, try autolua.wrap(func_unreachable), 0);
 //     testing.expectEqual(@as(c_int, lua.LUA_OK), lua.lua_pcallk(L, 0, lua.LUA_MULTRET, 0, 0, null));
 // }
 
