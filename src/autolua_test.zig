@@ -6,7 +6,7 @@ const autolua = @import("./autolua.zig");
 const lua = autolua.lua;
 
 test "returning an array" {
-    const L = lua.luaL_newstate();
+    const L = try autolua.newState(std.testing.allocator);
     defer lua.lua_close(L);
     lua.luaL_openlibs(L);
     testing.expectEqual(@as(c_int, lua.LUA_OK), lua.luaL_loadstring(L,
@@ -17,7 +17,7 @@ test "returning an array" {
 }
 
 test "returning a string" {
-    const L = lua.luaL_newstate();
+    const L = try autolua.newState(std.testing.allocator);
     defer lua.lua_close(L);
     lua.luaL_openlibs(L);
     testing.expectEqual(@as(c_int, lua.LUA_OK), lua.luaL_loadstring(L,
@@ -95,7 +95,7 @@ export fn luaopen_mylib(L: ?*lua.lua_State) c_int {
 }
 
 test "wrapping void returning function works" {
-    const L = lua.luaL_newstate();
+    const L = try autolua.newState(std.testing.allocator);
     defer lua.lua_close(L);
     lua.lua_pushcclosure(L, autolua.wrap(func_void), 0);
     testing.expectEqual(@as(c_int, lua.LUA_OK), lua.lua_pcallk(L, 0, lua.LUA_MULTRET, 0, 0, null));
@@ -103,7 +103,7 @@ test "wrapping void returning function works" {
 }
 
 test "wrapping boolean returning function works" {
-    const L = lua.luaL_newstate();
+    const L = try autolua.newState(std.testing.allocator);
     defer lua.lua_close(L);
     lua.lua_pushcclosure(L, autolua.wrap(func_bool), 0);
     testing.expectEqual(@as(c_int, lua.LUA_OK), lua.lua_pcallk(L, 0, lua.LUA_MULTRET, 0, 0, null));
@@ -111,7 +111,7 @@ test "wrapping boolean returning function works" {
 }
 
 test "wrapping integer returning function works" {
-    const L = lua.luaL_newstate();
+    const L = try autolua.newState(std.testing.allocator);
     defer lua.lua_close(L);
     lua.lua_pushcclosure(L, autolua.wrap(func_i8), 0);
     testing.expectEqual(@as(c_int, lua.LUA_OK), lua.lua_pcallk(L, 0, lua.LUA_MULTRET, 0, 0, null));
@@ -119,7 +119,7 @@ test "wrapping integer returning function works" {
 }
 
 test "wrapping float returning function works" {
-    const L = lua.luaL_newstate();
+    const L = try autolua.newState(std.testing.allocator);
     defer lua.lua_close(L);
     lua.lua_pushcclosure(L, autolua.wrap(func_f16), 0);
     testing.expectEqual(@as(c_int, lua.LUA_OK), lua.lua_pcallk(L, 0, lua.LUA_MULTRET, 0, 0, null));
@@ -127,7 +127,7 @@ test "wrapping float returning function works" {
 }
 
 test "wrapping function that takes arguments works" {
-    const L = lua.luaL_newstate();
+    const L = try autolua.newState(std.testing.allocator);
     defer lua.lua_close(L);
     lua.lua_pushcclosure(L, autolua.wrap(func_addu32), 0);
     lua.lua_pushinteger(L, 5);
@@ -137,7 +137,7 @@ test "wrapping function that takes arguments works" {
 }
 
 // test "wrapping function that throws error" {
-//     const L = lua.luaL_newstate();
+//     const L = try autolua.newState(std.testing.allocator);
 //     defer lua.lua_close(L);
 //     lua.lua_pushcclosure(L, autolua.wrap(func_error), 0);
 //     testing.expectEqual(@as(c_int, lua.LUA_ERRRUN), lua.lua_pcallk(L, 0, lua.LUA_MULTRET, 0, 0, null));
@@ -145,14 +145,14 @@ test "wrapping function that takes arguments works" {
 // }
 
 // test "wrapping unreachable function" {
-//     const L = lua.luaL_newstate();
+//     const L = try autolua.newState(std.testing.allocator);
 //     defer lua.lua_close(L);
 //     lua.lua_pushcclosure(L, autolua.wrap(func_unreachable), 0);
 //     testing.expectEqual(@as(c_int, lua.LUA_OK), lua.lua_pcallk(L, 0, lua.LUA_MULTRET, 0, 0, null));
 // }
 
 test "library works" {
-    const L = lua.luaL_newstate();
+    const L = try autolua.newState(std.testing.allocator);
     defer lua.lua_close(L);
     lua.luaL_openlibs(L);
     lua.luaL_requiref(L, "mylib", luaopen_mylib, 0);
@@ -169,7 +169,7 @@ test "library works" {
 }
 
 test "wrap struct works" {
-    const L = lua.luaL_newstate();
+    const L = try autolua.newState(std.testing.allocator);
     defer lua.lua_close(L);
     lua.luaL_openlibs(L);
     testing.expectEqual(@as(c_int, lua.LUA_OK), lua.luaL_loadstring(L,

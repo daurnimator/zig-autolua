@@ -12,6 +12,29 @@ inline fn lua_pop(L: var, n: var) void {
     return lua.lua_settop(L, -n - 1);
 }
 
+pub fn alloc(ud: ?*c_void, ptr: ?*c_void, osize: usize, nsize: usize) callconv(.C) ?*c_void {
+    const c_alignment = 16;
+    const allocator = @ptrCast(*std.mem.Allocator, @alignCast(@alignOf(std.mem.Allocator), ud));
+    if (@ptrCast(?[*]align(c_alignment) u8, @alignCast(c_alignment, ptr))) |previous_pointer| {
+        const previous_slice = previous_pointer[0..osize];
+        if (osize >= nsize) {
+            // Lua assumes that the allocator never fails when osize >= nsize.
+            return allocator.alignedShrink(previous_slice, c_alignment, nsize).ptr;
+        } else {
+            return (allocator.alignedRealloc(previous_slice, c_alignment, nsize) catch return null).ptr;
+        }
+    } else {
+        // osize is any of LUA_TSTRING, LUA_TTABLE, LUA_TFUNCTION, LUA_TUSERDATA, or LUA_TTHREAD
+        // when (and only when) Lua is creating a new object of that type.
+        // When osize is some other value, Lua is allocating memory for something else.
+        return (allocator.alignedAlloc(u8, c_alignment, nsize) catch return null).ptr;
+    }
+}
+
+pub fn newState(allocator: *std.mem.Allocator) !*lua.lua_State {
+    return lua.lua_newstate(alloc, allocator) orelse return error.OutOfMemory;
+}
+
 const lua_int_type = @typeInfo(lua.lua_Integer).Int;
 const lua_float_type = @typeInfo(lua.lua_Number).Float;
 pub fn push(L: ?*lua.lua_State, value: var) void {
