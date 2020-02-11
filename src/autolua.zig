@@ -187,7 +187,7 @@ pub fn wrap(comptime func: var) lua.lua_CFunction {
     // See https://github.com/ziglang/zig/issues/229
     return struct {
         // See https://github.com/ziglang/zig/issues/2930
-        fn call(L: ?*lua.lua_State) (if (Fn.return_type) |rt| rt else noreturn) {
+        fn call(L: ?*lua.lua_State) (if (Fn.return_type) |rt| rt else void) {
             if (Fn.args.len == 0) return @call(.{}, func, .{});
             const a1 = check(L, 1, Fn.args[0].arg_type.?);
             if (Fn.args.len == 1) return @call(.{}, func, .{a1});
