@@ -197,17 +197,12 @@ pub fn wrap(comptime func: var) lua.lua_CFunction {
         }
 
         fn thunk(L: ?*lua.lua_State) callconv(.C) c_int {
-            if (Fn.return_type) |return_type| {
-                const result: return_type = @call(.{ .modifier = .always_inline }, call, .{L});
-                if (return_type == void) {
-                    return 0;
-                } else {
-                    push(L, result);
-                    return 1;
-                }
+            const result = @call(.{ .modifier = .always_inline }, call, .{L});
+            if (@TypeOf(result) == void) {
+                return 0;
             } else {
-                // is noreturn
-                @call(.{ .modifier = .always_inline }, call, .{L});
+                push(L, result);
+                return 1;
             }
         }
     }.thunk;
