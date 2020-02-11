@@ -35,39 +35,54 @@ pub fn newState(allocator: *std.mem.Allocator) !*lua.lua_State {
     return lua.lua_newstate(alloc, allocator) orelse return error.OutOfMemory;
 }
 
-const lua_int_type = @typeInfo(lua.lua_Integer).Int;
-const lua_float_type = @typeInfo(lua.lua_Number).Float;
+const LuaIntTypeInfo = @typeInfo(lua.lua_Integer).Int;
+const LuaFloatTypeInfo = @typeInfo(lua.lua_Number).Float;
 pub fn push(L: ?*lua.lua_State, value: var) void {
-    switch (@typeId(@TypeOf(value))) {
+    const T = @TypeOf(value);
+    switch (@typeInfo(@TypeOf(value))) {
         .Void => lua.lua_pushnil(L),
-        .Bool => lua.lua_pushboolean(L, if (value) @as(u1, 1) else @as(u1, 0)),
-        .Int => {
-            const int_type = @typeInfo(@TypeOf(value)).Int;
-            assert(lua_int_type.is_signed);
-            if (int_type.bits > lua_int_type.bits or (!int_type.is_signed and int_type.bits >= lua_int_type.bits)) {
-                @compileError("unable to coerce from type: " ++ @typeName(@TypeOf(value)));
+        .Bool => lua.lua_pushboolean(L, @boolToInt(value)),
+        .Int => |IntInfo| {
+            assert(LuaIntTypeInfo.is_signed);
+            if (IntInfo.bits > LuaIntTypeInfo.bits or (!IntInfo.is_signed and IntInfo.bits >= LuaIntTypeInfo.bits)) {
+                @compileError("unable to coerce from type '" ++ @typeName(T) ++ "' (int too large)");
             }
             lua.lua_pushinteger(L, value);
         },
-        .Float => {
-            const float_type = @typeInfo(@TypeOf(value)).Float;
-            if (float_type.bits > lua_float_type.bits) {
-                @compileError("unable to coerce from type: " ++ @typeName(@TypeOf(value)));
+        .ComptimeInt => {
+            // Will error at comptime if out of range
+            lua.lua_pushinteger(L, value);
+        },
+        .Float => |FloatInfo| {
+            if (FloatInfo.bits > LuaFloatTypeInfo.bits) {
+                @compileError("unable to coerce from type '" ++ @typeName(T) ++ "' (float too large)");
             }
+            lua.lua_pushnumber(L, value);
+        },
+        .ComptimeFloat => {
+            // Will error at comptime if out of range
             lua.lua_pushnumber(L, value);
         },
         .Fn => {
             // TODO: check if already the correct signature?
             lua.lua_pushcclosure(L, wrap(value), 0);
         },
-        .Pointer => |PT| {
-            if (PT.size == .Slice and PT.child == u8) {
-                _ = lua.lua_pushlstring(L, value.ptr, value.len);
-            } else {
-                @compileError("unable to coerce from type: " ++ @typeName(@TypeOf(value)));
+        .Pointer => |PointerInfo| switch (PointerInfo.size) {
+            .Slice => {
+                if (PointerInfo.child == u8) {
+                    _ = lua.lua_pushlstring(L, value.ptr, value.len);
+                } else {
+                    @compileError("unable to coerce from type '" ++ @typeName(T) ++ "'");
+                }
+            },
+            else => @compileError("unable to coerce from type '" ++ @typeName(T) ++ "'"),
+        },
+        .Type => {
+            if (lua.luaL_newmetatable(L, @typeName(T)) == 1) {
+                // TODO: fill in the metatable with info about the type?
             }
         },
-        else => @compileError("unable to coerce from type: " ++ @typeName(@TypeOf(value))),
+        else => @compileError("unable to coerce from type '" ++ @typeName(@TypeOf(value)) ++ "'"),
     }
 }
 
@@ -91,14 +106,13 @@ pub fn pushlib(L: ?*lua.lua_State, comptime value: type) void {
 
     inline for (Composite.decls) |d| {
         if (d.is_pub) {
+            _ = lua.lua_pushlstring(L, d.name.ptr, d.name.len);
+            // workaround for "unable to evaluate constant expression" error when calling `push` with a function
             switch (d.data) {
-                .Var, .Fn => {
-                    _ = lua.lua_pushlstring(L, d.name.ptr, d.name.len);
-                    lua.lua_pushcclosure(L, wrap(@field(value, d.name)), 0);
-                    lua.lua_rawset(L, -3);
-                },
-                else => @compileError("NYI: Type"),
+                .Var, .Type => push(L, @field(value, d.name)),
+                .Fn => lua.lua_pushcclosure(L, wrap(@field(value, d.name)), 0),
             }
+            lua.lua_rawset(L, -3);
         }
     }
 }
