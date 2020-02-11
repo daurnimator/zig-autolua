@@ -7,6 +7,11 @@ pub const lua = @cImport({
     @cInclude("lualib.h");
 });
 
+// TODO: https://github.com/ziglang/zig/issues/4328
+inline fn lua_pop(L: var, n: var) void {
+    return lua.lua_settop(L, -n - 1);
+}
+
 const lua_int_type = @typeInfo(lua.lua_Integer).Int;
 const lua_float_type = @typeInfo(lua.lua_Number).Float;
 pub fn push(L: ?*lua.lua_State, value: var) void {
@@ -94,7 +99,7 @@ pub fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
                     for (A) |*p, i| {
                         _ = lua.lua_geti(L, idx, @intCast(lua.lua_Integer, i + 1));
                         p.* = check(L, -1, AT.child);
-                        lua.lua_pop(L, 1);
+                        lua_pop(L, 1);
                     }
                     return A;
                 },
