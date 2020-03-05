@@ -187,31 +187,18 @@ pub fn wrap(comptime func: var) lua.lua_CFunction {
     // See https://github.com/ziglang/zig/issues/229
     return struct {
         // See https://github.com/ziglang/zig/issues/2930
-        fn call(L: ?*lua.lua_State) (if (Fn.return_type) |rt| rt else void) {
-            if (Fn.args.len == 0) return @call(.{}, func, .{});
-            const a1 = check(L, 1, Fn.args[0].arg_type.?);
-            if (Fn.args.len == 1) return @call(.{}, func, .{a1});
-            const a2 = check(L, 2, Fn.args[1].arg_type.?);
-            if (Fn.args.len == 2) return @call(.{}, func, .{ a1, a2 });
-            const a3 = check(L, 3, Fn.args[2].arg_type.?);
-            if (Fn.args.len == 3) return @call(.{}, func, .{ a1, a2, a3 });
-            const a4 = check(L, 4, Fn.args[3].arg_type.?);
-            if (Fn.args.len == 4) return @call(.{}, func, .{ a1, a2, a3, a4 });
-            const a5 = check(L, 5, Fn.args[4].arg_type.?);
-            if (Fn.args.len == 5) return @call(.{}, func, .{ a1, a2, a3, a4, a5 });
-            const a6 = check(L, 6, Fn.args[5].arg_type.?);
-            if (Fn.args.len == 6) return @call(.{}, func, .{ a1, a2, a3, a4, a5, a6 });
-            const a7 = check(L, 7, Fn.args[6].arg_type.?);
-            if (Fn.args.len == 7) return @call(.{}, func, .{ a1, a2, a3, a4, a5, a6, a7 });
-            const a8 = check(L, 8, Fn.args[7].arg_type.?);
-            if (Fn.args.len == 8) return @call(.{}, func, .{ a1, a2, a3, a4, a5, a6, a7, a8 });
-            const a9 = check(L, 9, Fn.args[8].arg_type.?);
-            if (Fn.args.len == 9) return @call(.{}, func, .{ a1, a2, a3, a4, a5, a6, a7, a8, a9 });
-            @compileError("NYI: >9 argument functions");
+        fn call(L: ?*lua.lua_State, args: var) (if (Fn.return_type) |rt| rt else void) {
+            if (Fn.args.len == args.len) {
+                return @call(.{}, func, args);
+            } else {
+                const i = args.len;
+                const a = check(L, i + 1, Fn.args[i].arg_type.?);
+                return @call(.{ .modifier = .always_inline }, call, .{ L, args ++ .{a} });
+            }
         }
 
         fn thunk(L: ?*lua.lua_State) callconv(.C) c_int {
-            const result = @call(.{ .modifier = .always_inline }, call, .{L});
+            const result = @call(.{ .modifier = .always_inline }, call, .{ L, .{} });
             if (@TypeOf(result) == void) {
                 return 0;
             } else {
