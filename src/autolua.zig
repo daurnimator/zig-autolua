@@ -21,7 +21,7 @@ pub fn alloc(ud: ?*c_void, ptr: ?*c_void, osize: usize, nsize: usize) callconv(.
             // Lua assumes that the allocator never fails when osize >= nsize.
             return allocator.alignedShrink(previous_slice, c_alignment, nsize).ptr;
         } else {
-            return (allocator.alignedRealloc(previous_slice, c_alignment, nsize) catch return null).ptr;
+            return (allocator.reallocAdvanced(previous_slice, c_alignment, nsize, .exact) catch return null).ptr;
         }
     } else {
         // osize is any of LUA_TSTRING, LUA_TTABLE, LUA_TFUNCTION, LUA_TUSERDATA, or LUA_TTHREAD
