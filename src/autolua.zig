@@ -183,22 +183,16 @@ pub fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
 
 /// Wraps an arbitrary function in a Lua C-API using version
 pub fn wrap(comptime func: anytype) lua.lua_CFunction {
-    const Fn = @typeInfo(@TypeOf(func)).Fn;
+    const Args = std.meta.ArgsTuple(@TypeOf(func));
     // See https://github.com/ziglang/zig/issues/229
     return struct {
-        // See https://github.com/ziglang/zig/issues/2930
-        fn call(L: ?*lua.lua_State, args: anytype) (if (Fn.return_type) |rt| rt else void) {
-            if (Fn.args.len == args.len) {
-                return @call(.{}, func, args);
-            } else {
-                const i = args.len;
-                const a = check(L, i + 1, Fn.args[i].arg_type.?);
-                return @call(.{ .modifier = .always_inline }, call, .{ L, args ++ .{a} });
-            }
-        }
-
         fn thunk(L: ?*lua.lua_State) callconv(.C) c_int {
-            const result = @call(.{ .modifier = .always_inline }, call, .{ L, .{} });
+            var args: Args = undefined;
+            comptime var i = 0;
+            inline while (i < args.len) : (i += 1) {
+                args[i] = check(L, i + 1, @TypeOf(args[i]));
+            }
+            const result = @call(.{ .modifier = .always_inline }, func, args);
             if (@TypeOf(result) == void) {
                 return 0;
             } else {
