@@ -8,7 +8,7 @@ pub const lua = @cImport({
 });
 
 // TODO: https://github.com/ziglang/zig/issues/4328
-inline fn lua_pop(L: var, n: var) void {
+inline fn lua_pop(L: anytype, n: anytype) void {
     return lua.lua_settop(L, -n - 1);
 }
 
@@ -37,7 +37,7 @@ pub fn newState(allocator: *std.mem.Allocator) !*lua.lua_State {
 
 const LuaIntTypeInfo = @typeInfo(lua.lua_Integer).Int;
 const LuaFloatTypeInfo = @typeInfo(lua.lua_Number).Float;
-pub fn push(L: ?*lua.lua_State, value: var) void {
+pub fn push(L: ?*lua.lua_State, value: anytype) void {
     const T = @TypeOf(value);
     switch (@typeInfo(@TypeOf(value))) {
         .Void => lua.lua_pushnil(L),
@@ -182,12 +182,12 @@ pub fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
 }
 
 /// Wraps an arbitrary function in a Lua C-API using version
-pub fn wrap(comptime func: var) lua.lua_CFunction {
+pub fn wrap(comptime func: anytype) lua.lua_CFunction {
     const Fn = @typeInfo(@TypeOf(func)).Fn;
     // See https://github.com/ziglang/zig/issues/229
     return struct {
         // See https://github.com/ziglang/zig/issues/2930
-        fn call(L: ?*lua.lua_State, args: var) (if (Fn.return_type) |rt| rt else void) {
+        fn call(L: ?*lua.lua_State, args: anytype) (if (Fn.return_type) |rt| rt else void) {
             if (Fn.args.len == args.len) {
                 return @call(.{}, func, args);
             } else {
