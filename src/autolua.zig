@@ -7,11 +7,6 @@ pub const lua = @cImport({
     @cInclude("lualib.h");
 });
 
-// TODO: https://github.com/ziglang/zig/issues/4328
-inline fn lua_pop(L: anytype, n: anytype) void {
-    return lua.lua_settop(L, -n - 1);
-}
-
 pub fn alloc(ud: ?*c_void, ptr: ?*c_void, osize: usize, nsize: usize) callconv(.C) ?*c_void {
     const c_alignment = 16;
     const allocator = @ptrCast(*std.mem.Allocator, @alignCast(@alignOf(std.mem.Allocator), ud));
@@ -43,8 +38,8 @@ pub fn push(L: ?*lua.lua_State, value: anytype) void {
         .Void => lua.lua_pushnil(L),
         .Bool => lua.lua_pushboolean(L, @boolToInt(value)),
         .Int => |IntInfo| {
-            assert(LuaIntTypeInfo.is_signed);
-            if (IntInfo.bits > LuaIntTypeInfo.bits or (!IntInfo.is_signed and IntInfo.bits >= LuaIntTypeInfo.bits)) {
+            assert(LuaIntTypeInfo.signedness == .signed);
+            if (IntInfo.bits > LuaIntTypeInfo.bits or (IntInfo.signedness == .unsigned and IntInfo.bits >= LuaIntTypeInfo.bits)) {
                 @compileError("unable to coerce from type '" ++ @typeName(T) ++ "' (int too large)");
             }
             lua.lua_pushinteger(L, value);
@@ -121,7 +116,7 @@ pub fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
     switch (@typeInfo(T)) {
         .Void => {
             lua.luaL_checktype(L, idx, lua.LUA_TNIL);
-            return void;
+            return {};
         },
         .Bool => {
             lua.luaL_checktype(L, idx, lua.LUA_TBOOLEAN);
@@ -136,7 +131,7 @@ pub fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
                     for (A) |*p, i| {
                         _ = lua.lua_geti(L, idx, @intCast(lua.lua_Integer, i + 1));
                         p.* = check(L, -1, AT.child);
-                        lua_pop(L, 1);
+                        lua.lua_pop(L, 1);
                     }
                     return A;
                 },
@@ -147,7 +142,7 @@ pub fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
                 },
             }
         },
-        .Pointer => |PT| {
+        .Pointer => {
             if (T == *c_void) {
                 return lua.lua_topointer(L, idx);
             }
