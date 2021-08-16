@@ -173,7 +173,7 @@ pub fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
             // const ptr = lua.lua_touserdata(L, idx);
         },
         .Optional => |N| {
-            if (lua.lua_type(L, idx)<lua.LUA_TBOOLEAN){
+            if (lua.lua_type(L, idx)<lua.LUA_TBOOLEAN) {
                 return null;
             } 
             return check(L, idx, N.child);
