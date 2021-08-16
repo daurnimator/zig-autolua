@@ -172,6 +172,12 @@ pub fn check(L: ?*lua.lua_State, idx: c_int, comptime T: type) T {
             // lua.lua_pop(L, 1);
             // const ptr = lua.lua_touserdata(L, idx);
         },
+        .Optional => |N| {
+            if (lua.lua_isnoneornil(L, idx)) {
+                return null;
+            } 
+            return check(L, idx, N.child);
+        },
         else => @compileError("unable to coerce to type: " ++ @typeName(T)),
     }
 }
