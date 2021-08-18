@@ -36,6 +36,7 @@ pub fn push(L: ?*lua.lua_State, value: anytype) void {
     const T = @TypeOf(value);
     switch (@typeInfo(@TypeOf(value))) {
         .Void => lua.lua_pushnil(L),
+        .Null => lua.lua_pushnil(L),
         .Bool => lua.lua_pushboolean(L, @boolToInt(value)),
         .Int => |IntInfo| {
             assert(LuaIntTypeInfo.signedness == .signed);
@@ -83,6 +84,13 @@ pub fn push(L: ?*lua.lua_State, value: anytype) void {
                 push(L, x);
                 lua.lua_rawseti(L, -2, @intCast(c_int, i+1));
             }
+        },
+        .Optional => |N| {
+            if (value == null) {
+                lua.lua_pushnil(L);
+                return;
+            }
+            push(L, value.?);
         },
         else => @compileError("unable to coerce from type '" ++ @typeName(@TypeOf(value)) ++ "'"),
     }
