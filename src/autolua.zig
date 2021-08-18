@@ -77,6 +77,13 @@ pub fn push(L: ?*lua.lua_State, value: anytype) void {
                 // TODO: fill in the metatable with info about the type?
             }
         },
+        .Array => |A| {
+            lua.lua_createtable(L, 0, A.len);
+            for (value) |x, i| {
+                push(L, x);
+                lua.lua_rawseti(L, -2, @intCast(c_int, i+1));
+            }
+        },
         else => @compileError("unable to coerce from type '" ++ @typeName(@TypeOf(value)) ++ "'"),
     }
 }
