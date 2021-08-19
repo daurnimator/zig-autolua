@@ -7,6 +7,12 @@ pub const lua = @cImport({
     @cInclude("lualib.h");
 });
 
+pub const AutoluaOptions = struct {
+    NullType: enum { userdata, nil } = .userdata
+};
+
+pub var options = AutoluaOptions{};
+
 pub fn alloc(ud: ?*c_void, ptr: ?*c_void, osize: usize, nsize: usize) callconv(.C) ?*c_void {
     const c_alignment = 16;
     const allocator = @ptrCast(*std.mem.Allocator, @alignCast(@alignOf(std.mem.Allocator), ud));
@@ -36,7 +42,10 @@ pub fn push(L: ?*lua.lua_State, value: anytype) void {
     const T = @TypeOf(value);
     switch (@typeInfo(@TypeOf(value))) {
         .Void => lua.lua_pushnil(L),
-        .Null => lua.lua_pushnil(L),
+        .Null => switch(options.NullType) {
+            .userdata => lua.lua_pushlightuserdata(L, null),
+            .nil => lua.lua_pushnil(L)
+        },    
         .Bool => lua.lua_pushboolean(L, @boolToInt(value)),
         .Int => |IntInfo| {
             assert(LuaIntTypeInfo.signedness == .signed);
