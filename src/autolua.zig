@@ -87,10 +87,9 @@ pub fn push(L: ?*lua.lua_State, value: anytype) void {
         },
         .Optional => |N| {
             if (value == null) {
-                lua.lua_pushnil(L);
-            } else {
-                push(L, value.?);
+                return push(L, null);
             }
+            push(L, value.?);
         },
         else => @compileError("unable to coerce from type '" ++ @typeName(@TypeOf(value)) ++ "'"),
     }
